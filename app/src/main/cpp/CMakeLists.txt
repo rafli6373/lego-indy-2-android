@@ -5,6 +5,16 @@ project("legoindy2_native")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(NOT DEFINED ANDROID_NDK)
+    if(DEFINED CMAKE_ANDROID_NDK)
+        set(ANDROID_NDK ${CMAKE_ANDROID_NDK})
+    elseif(DEFINED ENV{ANDROID_NDK_HOME})
+        set(ANDROID_NDK $ENV{ANDROID_NDK_HOME})
+    elseif(DEFINED ENV{ANDROID_NDK_ROOT})
+        set(ANDROID_NDK $ENV{ANDROID_NDK_ROOT})
+    endif()
+endif()
+
 # Include Android native app glue
 include_directories(${ANDROID_NDK}/sources/android/native_app_glue)
 
