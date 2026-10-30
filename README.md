@@ -1,82 +1,148 @@
-# LEGO Indiana Jones 2: The Adventure Continues — Native Android Port Project
+<div align="center">
 
-Proyek ini adalah arsitektur dasar (*scaffolding framework*) untuk menjalankan game **LEGO Indiana Jones 2: The Adventure Continues** (ID: `ULUS10487`) secara **native** di platform Android menggunakan **C++17, Android NDK, dan OpenGL ES 3.0**.
+# 🤠 LEGO® Indiana Jones™ 2: The Adventure Continues
+### 🏺 Proyek Native Android Port (NDK C++17 & OpenGL ES 3.0) 🏺
 
----
-
-## 🏗️ Arsitektur Proyek
-
-Proyek ini dibangun menggunakan arsitektur **Native Activity (NDK)** tanpa memerlukan aplikasi emulator eksternal:
-
-```
-D:\Game\LEGO Indiana Jones 2 (ANDROID)/
-├── app/
-│   ├── build.gradle.kts           # Konfigurasi NDK, CMake, dan ABI target (arm64-v8a, armeabi-v7a)
-│   └── src/main/
-│       ├── AndroidManifest.xml    # Entry point NativeActivity & konfigurasi fullscreen landscape
-│       ├── assets/                # Folder tempat aset game (legoindy2psp.fib) disimpan
-│       └── cpp/
-│           ├── CMakeLists.txt     # Script build C++ & linkage library (GLESv3, EGL, Android, Log)
-│           ├── native_main.cpp    # Lifecycle event loop Android, inisialisasi EGL, input polling
-│           ├── psp_types.h        # Definisi hardware PSP (Register, Bitmask controller, Memori)
-│           ├── psp_hle.h / .cpp   # Host High-Level Emulation layer (sceIo, sceCtrl, sceKernel RAM)
-│           ├── psp_renderer_gl.*  # Renderer OpenGL ES 3.0 (Letterbox 16:9 & HUD controller)
-│           └── touch_controls.*   # Multi-touch virtual on-screen gamepad (Analog stick & tombol)
-├── build.gradle.kts               # Root gradle script
-├── settings.gradle.kts            # Module settings
-└── copy_assets.ps1                # Script otomatis menyalin data game ke folder assets
-```
+*"Fortune and glory, kid. Fortune and glory."*
 
 ---
 
-## 🎮 Fitur Komponen Native C++
+[![Platform](https://img.shields.io/badge/Platform-Android_ARM64-3DDC84.svg?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
+[![Graphics](https://img.shields.io/badge/Graphics-OpenGL_ES_3.0-5586A4.svg?style=for-the-badge&logo=opengl&logoColor=white)](https://www.khronos.org/opengles/)
+[![Language](https://img.shields.io/badge/C%2B%2B-17_Native_NDK-00599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)](https://developer.android.com/ndk)
+[![Game Title](https://img.shields.io/badge/Target-ULUS10487_(PSP)-FFD700.svg?style=for-the-badge&logo=playstation&logoColor=black)](https://en.wikipedia.org/wiki/Lego_Indiana_Jones_2:_The_Adventure_Continues)
+[![Build Status](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF.svg?style=for-the-badge&logo=githubactions&logoColor=white)](.github/workflows/build-apk.yml)
 
-1. **`native_main.cpp` (Android Lifecycle & EGL)**:
-   * Mengatur *context* EGL OpenGL ES 3.0 secara langsung di hardware grafis ponsel.
-   * Menangani *event loop* multi-touch Android secara *real-time* tanpa overhead Java/JNI.
+<br/>
 
-2. **`touch_controls.cpp` (Virtual Gamepad On-Screen)**:
-   * Virtual Analog Stick dengan deadzone dan normalisasi koordinat PSP (0 - 255).
-   * Tombol aksi (*Cross, Circle, Triangle, Square*).
-   * D-Pad (*Up, Down, Left, Right*), Trigger (*L, R*), dan Menu (*Start, Select*).
+**Siapkan topi Fedora dan cambuk andalanmu! Bawa petualangan legendaris Dr. Henry Jones Jr. menjelajahi 4 film klasik langsung ke genggaman ponsel Android — 100% Native, cepat, dan mandiri tanpa aplikasi emulator pihak ketiga.**
 
-3. **`psp_renderer_gl.cpp` (OpenGL ES 3.0)**:
-   * Mempertahankan *aspect ratio* asli PSP (16:9 / 480x272) dengan kalkulasi *letterbox* adaptif di layar smartphone modern (19:9 / 20:9).
-   * Rendering 2D shader untuk HUD kontrol sentuh transparan.
-
-4. **`psp_hle.cpp` (Host OS Abstraction Layer)**:
-   * **`sceIoOpen / sceIoRead / sceIoLseek`**: Membaca file arsip game (`legoindy2psp.fib`) baik dari direktori internal APK (`AAssetManager`) maupun penyimpanan eksternal Android (`/sdcard/Android/data/...`).
-   * **`sceCtrlReadBufferPositive`**: Memetakan sentuhan jari ke struktur data controller PSP (`SceCtrlData`).
-   * **`PspMemory`**: Mengalokasikan blok memori 56 MB untuk simulasi *User RAM* PSP.
+[🌟 Fitur Utama](#-fitur-utama-true-adventurer) • [🏛️ Arsitektur Arkeologi](#-arsitektur-arkeologi-mesin-game) • [🎒 Ekspedisi Aset](#-ekspedisi-persiapan-aset-game) • [⚡ Build APK di Cloud](#-membangun-relik-apk-via-github-actions) • [🕹️ Tata Letak Kontrol](#-tata-letak-virtual-gamepad-touchscreen) • [📜 Piagam Kebijaksanaan](#-piagam-kebijaksanaan--disclaimer)
 
 ---
 
-## 🚀 Cara Menyiapkan dan Build
+</div>
 
-### 1. Salin Aset Game
-Jalankan skrip PowerShell berikut untuk menyalin arsip utama game dari folder game Anda ke direktori aset Android:
-```powershell
-cd "D:\Game\LEGO Indiana Jones 2 (ANDROID)"
-.\copy_assets.ps1
-```
+<br/>
 
-### 2. Buka di Android Studio
-1. Buka **Android Studio**.
-2. Pilih **Open** lalu arahkan ke folder: `D:\Game\LEGO Indiana Jones 2 (ANDROID)`.
-3. Tunggu hingga Gradle Sync selesai.
-4. Hubungkan smartphone Android Anda (aktifkan *USB Debugging*), lalu tekan **Run (Shift + F10)**.
+## 🌟 Fitur Utama ("True Adventurer")
 
-### 3. Build via Command Line (Gradle)
-Jika Anda memiliki Android SDK dan NDK terpasang di sistem:
-```bash
-./gradlew assembleDebug
-```
-File APK akan dibuat di: `app/build/outputs/apk/debug/app-debug.apk`.
+* ⚡ **Murni Native NDK (Zero Emulator App Overhead)**:
+  Dibangun menggunakan arsitektur **Android NativeActivity (C++17)**. Biner berjalan langsung pada prosesor ARM ponsel Anda tanpa perlu membuka emulator eksternal.
+* 🧱 **High-Level Emulation (HLE) Host Layer**:
+  Menerjemahkan *syscalls* PSP secara langsung ke Android: manajemen memori virtual RAM 56 MB, *file stream loader* arsip `legoindy2psp.fib`, serta pembacaan input joystick.
+* 💎 **Adaptive Cinema Viewport (16:9 Letterbox)**:
+  Tampilan rasio asli PSP (480x272) disesuaikan secara otomatis ke layar ponsel modern (18:9, 19.5:9, 20:9 AMOLED) dengan bingkai latar dinamis tanpa distorsi gambar.
+* 🪢 **Virtual Fedora & Bullwhip Gamepad**:
+  Kontrol sentuh multi-touch transparan di layar lengkap dengan **Analog Stick 360°**, tombol aksi berwarna PlayStation (*Cross, Circle, Triangle, Square*), *D-Pad*, dan *Shoulder Triggers* (*L/R*).
+* ☁️ **GitHub Actions Cloud Foundry**:
+  Kompilasi otomatis APK langsung di cloud GitHub setiap kali ada pembaruan kode. Anda tidak perlu mengunduh puluhan gigabyte Android Studio & NDK di komputer!
 
 ---
 
-## 🔗 Menghubungkan Output Static Recompilation (PSPRecomp)
-Jika Anda menggunakan framework **PSPRecomp** atau **psprecomp** untuk me-*lift* biner `EBOOT.BIN` menjadi kode C++:
-1. Tempatkan file fungsi C++ hasil recompilasi ke dalam folder `app/src/main/cpp/recompiled/`.
-2. Daftarkan file tersebut ke dalam `app/src/main/cpp/CMakeLists.txt`.
-3. Panggil fungsi entry point game di dalam `native_main.cpp` setelah `PspHLE::instance().init()` berhasil dijalankan.
+## 🏛️ Arsitektur Arkeologi Mesin Game
+
+Proyek ini terstruktur rapi ke dalam modul-modul modular:
+
+```text
+📦 LEGO Indiana Jones 2 (ANDROID)
+ ├── 📜 README.md                    # Catatan ekspedisi & dokumentasi ini
+ ├── 📜 .gitignore                   # Menjaga artefak rahasia & copyright tetap aman
+ ├── ⚙️ copy_assets.ps1              # Mantra PowerShell untuk menyalin data game
+ ├── ⚙️ build.gradle.kts             # Konfigurasi Gradle utama
+ ├── 📂 .github/workflows/
+ │    └── 🚀 build-apk.yml           # Mesin otomatis pembuat APK di awan GitHub
+ └── 📂 app/
+      ├── ⚙️ build.gradle.kts        # Skrip kompilasi NDK Clang (arm64-v8a / armeabi-v7a)
+      └── 📂 src/main/
+           ├── 📜 AndroidManifest.xml # Gerbang aplikasi Fullscreen Landscape
+           ├── 📂 assets/             # Kuil penyimpanan artefak (legoindy2psp.fib)
+           └── 📂 cpp/
+                ├── 📄 CMakeLists.txt     # Blueprint kompilasi C++ & library grafis
+                ├── 🧱 native_main.cpp    # Jantung aplikasi: EGL, loop animasi & sentuhan
+                ├── 🏺 psp_types.h        # Kamus hieroglif register & hardware PSP
+                ├── 🗺️ psp_hle.h / .cpp   # Jembatan I/O file arsip data & memori
+                ├── 🎨 psp_renderer_gl.*  # Kuas grafis OpenGL ES 3.0 & tata letak layar
+                └── 🕹️ touch_controls.*   # Mekanisme controller analog & tombol sentuh
+```
+
+---
+
+## 🎒 Ekspedisi: Persiapan Aset Game
+
+Untuk menjalankan petualangan ini, game membutuhkan arsip data dari kepingan disc asli:
+
+1. Pastikan Anda memiliki folder ekstraksi disc game di:  
+   `D:\Game\LEGO Indiana Jones 2 The Adventure Continues` (berisi file `legoindy2psp.fib` di `PSP_GAME\USRDIR`).
+2. Jalankan skrip pembantu otomatis dengan membuka PowerShell:
+   ```powershell
+   cd "D:\Game\LEGO Indiana Jones 2 (ANDROID)"
+   .\copy_assets.ps1
+   ```
+3. Aset utama game akan secara otomatis disalin ke dalam direktori `app/src/main/assets/` dan siap dipaketkan ke dalam APK.
+
+---
+
+## ⚡ Membangun Relik APK via GitHub Actions
+
+Tidak punya Android Studio di komputer? **Jangan khawatir!** Anda bisa memanfaatkan komputasi awan GitHub:
+
+```mermaid
+flowchart LR
+    A["💻 Push Kode ke GitHub"] --> B["☁️ GitHub Actions Runner"]
+    B --> C["🔧 Setup NDK 25 & CMake"]
+    C --> D["⚙️ Compile C++ & Gradle"]
+    D --> E["📱 Download APK Siap Pasang"]
+```
+
+1. **Buat Repositori Baru** di [GitHub](https://github.com/new) (beri nama misalnya `lego-indy-2-android`).
+2. **Kirim Kode ke GitHub**:
+   ```bash
+   cd "D:\Game\LEGO Indiana Jones 2 (ANDROID)"
+   git remote add origin https://github.com/USERNAME/lego-indy-2-android.git
+   git push -u origin main
+   ```
+3. **Ambil APK**: Buka tab **Actions** di GitHub Anda, klik proses build yang selesai, lalu unduh artefak **`LegoIndy2-Native-Debug-APK`**.
+
+---
+
+## 🕹️ Tata Letak Virtual Gamepad Touchscreen
+
+Layar sentuh smartphone Anda dirancang menyerupai genggaman konsol petualangan:
+
+```text
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │ [ L ]                                                            [ R ] │
+ │                                                                        │
+ │        [▲]                                              (△)            │
+ │     [◄]   [►]                                        (□)   (○)         │
+ │        [▼]                                              (✕)            │
+ │                                                                        │
+ │     ╭───────╮                                                          │
+ │     │   ●   │  ANALOG STICK                  [SELECT]   [START]        │
+ │     ╰───────╯                                                          │
+ └────────────────────────────────────────────────────────────────────────┘
+```
+
+* **Analog Stick (Bawah Kiri)**: Menggerakkan Indy mengarungi rawa Amazon, makam kuno, dan piramida Akator.
+* **Tombol Aksi (Kanan)**:
+  * **(✕) Cross**: Lompat melompati jurang dan perangkap lantai.
+  * **(○) Circle**: Mengayunkan cambuk (*whip*) untuk bergelantungan atau menarik objek.
+  * **(□) Square**: Memukul musuh atau merakit kembali balok-balok LEGO yang berserakan.
+  * **(△) Triangle**: Mengganti karakter aktif (Marion, Mutt, Sallah, dll).
+* **[L] & [R]**: Menembak, melempar objek, atau aksi khusus kendaraan.
+
+---
+
+## 📜 Piagam Kebijaksanaan & Disclaimer
+
+> [!IMPORTANT]
+> Proyek ini adalah studi rekayasa perangkat lunak independen (*educational reverse engineering & wrapper framework*). 
+> * **Aset Hak Cipta**: Seluruh aset audiovisual, nama karakter, dan konten permainan adalah hak cipta milik **Lucasfilm Ltd., LEGO Group, dan TT Games / Warner Bros. Games**. 
+> * Repositori ini **tidak mendistribusikan berkas komersial berhak cipta**. Pengguna diwajibkan menyediakan salinan sah dari media permainan yang mereka miliki secara legal.
+
+---
+
+<div align="center">
+  <sub>Ditempa dengan ❤️ dan balok LEGO untuk para penjelajah dunia di seluruh nusantara.</sub>
+</div>
