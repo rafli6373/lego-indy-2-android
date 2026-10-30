@@ -147,7 +147,7 @@ Layar sentuh smartphone Anda dirancang menyerupai genggaman konsol petualangan:
 > * Repositori ini **tidak mendistribusikan berkas komersial berhak cipta**. Pengguna diwajibkan menyediakan salinan sah dari media permainan yang mereka miliki secara legal.
 
 ---
-
+ 
 <div align="center">
   <sub>Ditempa dengan ❤️ dan balok LEGO untuk para penjelajah dunia di seluruh nusantara.</sub>
 </div>
