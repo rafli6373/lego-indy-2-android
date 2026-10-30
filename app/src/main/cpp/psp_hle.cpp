@@ -3,7 +3,7 @@
 #include <chrono>
 #include <thread>
 #include <unistd.h>
-#include <sys/stat.h>
+#include <cstdlib>
 #include <cstring>
 
 #define LOG_TAG "PspHLE"
@@ -17,11 +17,11 @@ PspHLE& PspHLE::instance() {
 }
 
 PspHLE::PspHLE()
-    : m_assetManager(nullptr),
-      m_touchControls(nullptr),
+    : m_touchControls(nullptr),
       m_userMemory(nullptr),
-      m_gameDataFound(false),
-      m_nextFd(10) {
+      m_userMemorySize(PSP_USER_MEM_SIZE),
+      m_nextFd(10),
+      m_gameReady(false) {
 }
 
 PspHLE::~PspHLE() {
@@ -29,38 +29,38 @@ PspHLE::~PspHLE() {
 }
 
 bool PspHLE::init(AAssetManager* assetManager, const std::string& storagePath) {
-    m_assetManager = assetManager;
-    m_storagePath = storagePath;
+    // 1. Initialize Virtual File System
+    if (!PspVFS::instance().init(assetManager, storagePath)) {
+        LOGE("Failed to initialize VFS");
+        return false;
+    }
 
-    // Allocate 56 MB aligned virtual memory for PSP user space
-    m_userMemory = static_cast<uint8_t*>(malloc(PSP_USER_MEM_SIZE));
+    // 2. Initialize Graphics Engine subsystem
+    PspGE::instance().init();
+
+    // 3. Allocate 56 MB aligned virtual memory for PSP User RAM
+    m_userMemory = static_cast<uint8_t*>(malloc(m_userMemorySize));
     if (!m_userMemory) {
-        LOGE("Failed to allocate %u bytes of PSP User Memory", PSP_USER_MEM_SIZE);
+        LOGE("Failed to allocate %zu bytes of PSP RAM", m_userMemorySize);
         m_statusMessage = "Err: Out of Memory for PSP RAM";
         return false;
     }
-    std::memset(m_userMemory, 0, PSP_USER_MEM_SIZE);
+    std::memset(m_userMemory, 0, m_userMemorySize);
+    LOGI("PSP RAM mapped at %p (%zu MB)", m_userMemory, m_userMemorySize / (1024 * 1024));
 
-    LOGI("PSP User Memory mapped at %p (%u MB)", m_userMemory, PSP_USER_MEM_SIZE / (1024 * 1024));
-
-    // Check for LEGO Indiana Jones 2 primary archive: legoindy2psp.fib
-    std::string testPath = m_storagePath + "/PSP_GAME/USRDIR/legoindy2psp.fib";
-    struct stat st;
-    if (stat(testPath.c_str(), &st) == 0 && st.st_size > 0) {
-        m_gameDataFound = true;
-        m_statusMessage = "Found legoindy2psp.fib (" + std::to_string(st.st_size / (1024 * 1024)) + " MB)";
+    // 4. Check for LEGO Indiana Jones 2 executable and data
+    std::string bootPath = storagePath + "/PSP_GAME/SYSDIR/BOOT.BIN";
+    if (m_elfLoader.loadFromFile(bootPath, m_userMemory, m_userMemorySize)) {
+        m_gameReady = true;
+        m_statusMessage = "BOOT.BIN loaded! Entry: 0x" + std::to_string(m_elfLoader.getModuleInfo().entryPoint);
         LOGI("%s", m_statusMessage.c_str());
     } else {
-        // Fallback check in root storage
-        testPath = m_storagePath + "/legoindy2psp.fib";
-        if (stat(testPath.c_str(), &st) == 0 && st.st_size > 0) {
-            m_gameDataFound = true;
-            m_statusMessage = "Found legoindy2psp.fib (" + std::to_string(st.st_size / (1024 * 1024)) + " MB)";
-            LOGI("%s", m_statusMessage.c_str());
+        if (PspVFS::instance().isGameArchiveMounted()) {
+            m_gameReady = true;
+            m_statusMessage = PspVFS::instance().getArchiveInfo();
         } else {
-            m_gameDataFound = false;
-            m_statusMessage = "Waiting for game assets in " + m_storagePath;
-            LOGW("%s", m_statusMessage.c_str());
+            m_gameReady = false;
+            m_statusMessage = "Ready: Place legoindy2psp.fib in " + storagePath;
         }
     }
 
@@ -68,14 +68,13 @@ bool PspHLE::init(AAssetManager* assetManager, const std::string& storagePath) {
 }
 
 void PspHLE::shutdown() {
-    for (auto& [fd, handle] : m_openFiles) {
-        if (handle.isAsset && handle.assetFile) {
-            AAsset_close(handle.assetFile);
-        } else if (handle.hostFile) {
-            fclose(handle.hostFile);
-        }
+    for (auto& [fd, stream] : m_openFiles) {
+        if (stream) stream->close();
     }
     m_openFiles.clear();
+
+    PspGE::instance().shutdown();
+    PspVFS::instance().shutdown();
 
     if (m_userMemory) {
         free(m_userMemory);
@@ -83,101 +82,44 @@ void PspHLE::shutdown() {
     }
 }
 
-std::string PspHLE::resolvePspPath(const std::string& pspPath) {
-    std::string cleaned = pspPath;
-
-    // Strip PSP volume prefixes
-    if (cleaned.rfind("disc0:/", 0) == 0) {
-        cleaned = cleaned.substr(7);
-    } else if (cleaned.rfind("ms0:/", 0) == 0) {
-        cleaned = cleaned.substr(5);
-    }
-
-    // Try in primary storage path
-    std::string fullPath = m_storagePath + "/" + cleaned;
-    struct stat st;
-    if (stat(fullPath.c_str(), &st) == 0) {
-        return fullPath;
-    }
-
-    // Try under PSP_GAME subfolder
-    fullPath = m_storagePath + "/PSP_GAME/" + cleaned;
-    if (stat(fullPath.c_str(), &st) == 0) {
-        return fullPath;
-    }
-
-    return m_storagePath + "/" + cleaned;
-}
-
 int PspHLE::sceIoOpen(const char* filename, int flags, int mode) {
-    (void)flags;
     (void)mode;
     if (!filename) return -1;
 
-    std::string resolved = resolvePspPath(filename);
-    FILE* f = fopen(resolved.c_str(), "rb");
-    if (f) {
-        int fd = m_nextFd++;
-        m_openFiles[fd] = {f, nullptr, false};
-        LOGI("sceIoOpen host file: %s -> fd %d", resolved.c_str(), fd);
-        return fd;
+    auto stream = PspVFS::instance().open(filename, flags);
+    if (!stream) {
+        LOGW("sceIoOpen failed for: %s", filename);
+        return -1;
     }
 
-    // Try Android APK internal assets
-    if (m_assetManager) {
-        AAsset* asset = AAssetManager_open(m_assetManager, filename, AASSET_MODE_RANDOM);
-        if (asset) {
-            int fd = m_nextFd++;
-            m_openFiles[fd] = {nullptr, asset, true};
-            LOGI("sceIoOpen asset file: %s -> fd %d", filename, fd);
-            return fd;
-        }
-    }
-
-    LOGW("sceIoOpen failed for: %s (resolved: %s)", filename, resolved.c_str());
-    return -1;
+    int fd = m_nextFd++;
+    m_openFiles[fd] = stream;
+    LOGI("sceIoOpen success: %s -> fd %d", filename, fd);
+    return fd;
 }
 
 int PspHLE::sceIoRead(int fd, void* data, size_t size) {
     auto it = m_openFiles.find(fd);
-    if (it == m_openFiles.end() || !data) return -1;
-
-    if (it->second.isAsset) {
-        return AAsset_read(it->second.assetFile, data, size);
-    } else {
-        return static_cast<int>(fread(data, 1, size, it->second.hostFile));
-    }
+    if (it == m_openFiles.end() || !it->second || !data) return -1;
+    return static_cast<int>(it->second->read(data, size));
 }
 
 int PspHLE::sceIoWrite(int fd, const void* data, size_t size) {
     auto it = m_openFiles.find(fd);
-    if (it == m_openFiles.end() || it->second.isAsset || !data) return -1;
-
-    return static_cast<int>(fwrite(data, 1, size, it->second.hostFile));
+    if (it == m_openFiles.end() || !it->second || !data) return -1;
+    return static_cast<int>(it->second->write(data, size));
 }
 
 long long PspHLE::sceIoLseek(int fd, long long offset, int whence) {
     auto it = m_openFiles.find(fd);
-    if (it == m_openFiles.end()) return -1;
-
-    if (it->second.isAsset) {
-        return AAsset_seek(it->second.assetFile, static_cast<off_t>(offset), whence);
-    } else {
-        fseek(it->second.hostFile, static_cast<long>(offset), whence);
-        return ftell(it->second.hostFile);
-    }
+    if (it == m_openFiles.end() || !it->second) return -1;
+    return it->second->seek(offset, whence);
 }
 
 int PspHLE::sceIoClose(int fd) {
     auto it = m_openFiles.find(fd);
-    if (it == m_openFiles.end()) return -1;
-
-    if (it->second.isAsset) {
-        AAsset_close(it->second.assetFile);
-    } else {
-        fclose(it->second.hostFile);
-    }
-
+    if (it == m_openFiles.end() || !it->second) return -1;
+    it->second->close();
     m_openFiles.erase(it);
     return 0;
 }
@@ -199,6 +141,27 @@ int PspHLE::sceCtrlReadBufferPositive(SceCtrlData* pad_data, int count) {
         }
     }
     return count;
+}
+
+int PspHLE::sceCtrlPeekBufferPositive(SceCtrlData* pad_data, int count) {
+    return sceCtrlReadBufferPositive(pad_data, count);
+}
+
+int PspHLE::sceDisplayWaitVblankStart() {
+    PspGE::instance().waitVblank();
+    return 0;
+}
+
+int PspHLE::sceDisplaySetMode(int mode, int width, int height) {
+    (void)mode;
+    PspGE::instance().setViewport(0, 0, static_cast<float>(width), static_cast<float>(height));
+    return 0;
+}
+
+int PspHLE::sceDisplaySetFrameBuf(uint32_t topaddr, int bufferwidth, int pixelformat, int sync) {
+    (void)sync;
+    PspGE::instance().setFrameBuffer(topaddr, bufferwidth, pixelformat);
+    return 0;
 }
 
 uint32_t PspHLE::sceKernelGetSystemTimeLow() {

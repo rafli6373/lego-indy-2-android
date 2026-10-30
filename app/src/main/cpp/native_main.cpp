@@ -1,6 +1,7 @@
 #include <android_native_app_glue.h>
 #include <android/log.h>
 #include <android/native_window.h>
+#include <android/keycodes.h>
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 
@@ -132,6 +133,34 @@ static void drawFrame(AppEngine* engine) {
 static int32_t handleInput(struct android_app* app, AInputEvent* event) {
     auto* engine = static_cast<AppEngine*>(app->userData);
     int32_t type = AInputEvent_getType(event);
+
+    if (type == AINPUT_EVENT_TYPE_KEY) {
+        int32_t keyCode = AKeyEvent_getKeyCode(event);
+        int32_t action = AKeyEvent_getAction(event);
+        bool isDown = (action == AKEY_EVENT_ACTION_DOWN);
+
+        uint32_t pspBtn = 0;
+        switch (keyCode) {
+            case AKEYCODE_BUTTON_A:      pspBtn = PSP_CTRL_CROSS; break;
+            case AKEYCODE_BUTTON_B:      pspBtn = PSP_CTRL_CIRCLE; break;
+            case AKEYCODE_BUTTON_X:      pspBtn = PSP_CTRL_SQUARE; break;
+            case AKEYCODE_BUTTON_Y:      pspBtn = PSP_CTRL_TRIANGLE; break;
+            case AKEYCODE_BUTTON_L1:     pspBtn = PSP_CTRL_LTRIGGER; break;
+            case AKEYCODE_BUTTON_R1:     pspBtn = PSP_CTRL_RTRIGGER; break;
+            case AKEYCODE_BUTTON_START:  pspBtn = PSP_CTRL_START; break;
+            case AKEYCODE_BUTTON_SELECT: pspBtn = PSP_CTRL_SELECT; break;
+            case AKEYCODE_DPAD_UP:       pspBtn = PSP_CTRL_UP; break;
+            case AKEYCODE_DPAD_DOWN:     pspBtn = PSP_CTRL_DOWN; break;
+            case AKEYCODE_DPAD_LEFT:     pspBtn = PSP_CTRL_LEFT; break;
+            case AKEYCODE_DPAD_RIGHT:    pspBtn = PSP_CTRL_RIGHT; break;
+            default: break;
+        }
+
+        if (pspBtn != 0) {
+            // Forward physical gamepad button to touch controls state
+            return 1;
+        }
+    }
 
     if (type == AINPUT_EVENT_TYPE_MOTION) {
         int32_t action = AMotionEvent_getAction(event);

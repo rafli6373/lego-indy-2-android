@@ -3,10 +3,13 @@
 
 #include "psp_types.h"
 #include "touch_controls.h"
+#include "psp_vfs.h"
+#include "psp_elf_loader.h"
+#include "psp_ge.h"
 #include <android/asset_manager.h>
 #include <string>
 #include <unordered_map>
-#include <vector>
+#include <memory>
 
 class PspHLE {
 public:
@@ -26,38 +29,36 @@ public:
 
     // --- Controller / Input (sceCtrl) ---
     int sceCtrlReadBufferPositive(SceCtrlData* pad_data, int count);
+    int sceCtrlPeekBufferPositive(SceCtrlData* pad_data, int count);
 
-    // --- Memory / Kernel (sceKernel) ---
-    void* getBaseUserMemory() const { return m_userMemory; }
+    // --- Display & Graphics (sceDisplay, sceGe) ---
+    int sceDisplayWaitVblankStart();
+    int sceDisplaySetMode(int mode, int width, int height);
+    int sceDisplaySetFrameBuf(uint32_t topaddr, int bufferwidth, int pixelformat, int sync);
+
+    // --- Memory & Kernel (sceKernel) ---
+    uint8_t* getBaseUserMemory() const { return m_userMemory; }
     uint32_t sceKernelGetSystemTimeLow();
     void sceKernelDelayThread(uint32_t usec);
 
-    // Status / Asset info
-    bool isGameDataFound() const { return m_gameDataFound; }
+    // System Status
+    bool isGameReady() const { return m_gameReady; }
     std::string getStatusMessage() const { return m_statusMessage; }
 
 private:
     PspHLE();
     ~PspHLE();
 
-    std::string resolvePspPath(const std::string& pspPath);
-
-    AAssetManager* m_assetManager;
-    std::string m_storagePath;
     TouchControls* m_touchControls;
-
     uint8_t* m_userMemory;
-    bool m_gameDataFound;
-    std::string m_statusMessage;
+    size_t m_userMemorySize;
 
-    struct OpenFileHandle {
-        FILE* hostFile;
-        AAsset* assetFile;
-        bool isAsset;
-    };
-
-    std::unordered_map<int, OpenFileHandle> m_openFiles;
+    PspElfLoader m_elfLoader;
+    std::unordered_map<int, std::shared_ptr<IVfsStream>> m_openFiles;
     int m_nextFd;
+
+    bool m_gameReady;
+    std::string m_statusMessage;
 };
 
 #endif // PSP_HLE_H

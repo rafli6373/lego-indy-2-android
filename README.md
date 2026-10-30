@@ -38,6 +38,8 @@
 * ☁️ **GitHub Actions Cloud Foundry**:
   Kompilasi otomatis APK langsung di cloud GitHub setiap kali ada pembaruan kode. Anda tidak perlu mengunduh puluhan gigabyte Android Studio & NDK di komputer!
 
+> **Status saat ini:** APK masih berupa kerangka/prototipe. Kode native baru menggambar latar dan kontrol sentuh; belum ada inti emulasi PSP atau proses boot game. Karena itu, layar permainan belum akan menampilkan LEGO Indiana Jones 2 meskipun arsip game tersedia.
+
 ---
 
 ## 🏛️ Arsitektur Arkeologi Mesin Game
@@ -60,10 +62,13 @@ Proyek ini terstruktur rapi ke dalam modul-modul modular:
            └── 📂 cpp/
                 ├── 📄 CMakeLists.txt     # Blueprint kompilasi C++ & library grafis
                 ├── 🧱 native_main.cpp    # Jantung aplikasi: EGL, loop animasi & sentuhan
-                ├── 🏺 psp_types.h        # Kamus hieroglif register & hardware PSP
-                ├── 🗺️ psp_hle.h / .cpp   # Jembatan I/O file arsip data & memori
+                ├── 🏺 psp_types.h        # Kamus hieroglif register, ELF header & hardware PSP
+                ├── 📂 psp_vfs.h / .cpp   # PortableKit-style Virtual File System (disc0:/, ms0:/)
+                ├── ⚡ psp_elf_loader.*   # MIPS ELF/PRX binary loader & memory mapper
+                ├── 🎮 psp_ge.h / .cpp    # PSP Graphics Engine (GE) display list processor
+                ├── 🗺️ psp_hle.h / .cpp   # Jembatan syscall I/O file, timing & memori
                 ├── 🎨 psp_renderer_gl.*  # Kuas grafis OpenGL ES 3.0 & tata letak layar
-                └── 🕹️ touch_controls.*   # Mekanisme controller analog & tombol sentuh
+                └── 🕹️ touch_controls.*   # Mekanisme controller analog & gamepad fisik
 ```
 
 ---
