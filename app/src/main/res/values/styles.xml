@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.LegoIndy2Native" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

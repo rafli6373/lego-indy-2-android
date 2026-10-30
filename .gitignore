@@ -1,0 +1,22 @@
+# Android & Gradle Build Artifacts
+.gradle/
+build/
+app/build/
+app/.cxx/
+*.apk
+*.aab
+
+# IDE & Editor files
+.idea/
+*.iml
+.vscode/
+local.properties
+.DS_Store
+
+# Large Game Assets (Do NOT upload proprietary copyrighted assets to public GitHub)
+app/src/main/assets/*.fib
+app/src/main/assets/*.fmv
+app/src/main/assets/*.at3
+app/src/main/assets/*.iso
+app/src/main/assets/*.cso
+app/src/main/assets/*.bin
