@@ -5,6 +5,7 @@ plugins {
 android {
     namespace = "com.ttgames.legoindy2"
     compileSdk = 34
+    ndkVersion = "25.2.9519653"
 
     defaultConfig {
         applicationId = "com.ttgames.legoindy2"
@@ -15,7 +16,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += "-std=c++17 -Wall -Wextra -O3 -fexceptions"
+                cppFlags += "-std=c++17 -O3 -fexceptions"
                 arguments += "-DANDROID_STL=c++_shared"
             }
         }
