@@ -1,4 +1,5 @@
 #include "psp_hle.h"
+#include "psp_cpu.h"
 #include <android/log.h>
 #include <chrono>
 #include <thread>
@@ -171,4 +172,103 @@ uint32_t PspHLE::sceKernelGetSystemTimeLow() {
 
 void PspHLE::sceKernelDelayThread(uint32_t usec) {
     usleep(usec);
+}
+
+void PspHLE::startExecution() {
+    if (!m_userMemory) return;
+
+    PspCPU::instance().init(m_userMemory, m_userMemorySize, PSP_USER_MEM_BASE);
+    uint32_t entryPoint = m_elfLoader.getModuleInfo().entryPoint;
+    if (entryPoint == 0) {
+        entryPoint = PSP_USER_MEM_BASE;
+    }
+    uint32_t stackPointer = PSP_USER_MEM_BASE + static_cast<uint32_t>(m_userMemorySize) - 0x10000;
+    PspCPU::instance().reset(entryPoint, stackPointer);
+    PspCPU::instance().start();
+    LOGI("CPU Engine started for LEGO Indiana Jones 2");
+}
+
+void PspHLE::stopExecution() {
+    PspCPU::instance().stop();
+    LOGI("CPU Engine stopped");
+}
+
+void PspHLE::dispatchSyscall(uint32_t code) {
+    auto& cpu = PspCPU::instance();
+    uint32_t a0 = cpu.getReg(4);
+    uint32_t a1 = cpu.getReg(5);
+    uint32_t a2 = cpu.getReg(6);
+    uint32_t a3 = cpu.getReg(7);
+
+    // Translate pointer arguments relative to PSP RAM
+    auto resolvePtr = [&](uint32_t addr) -> void* {
+        if (addr >= PSP_USER_MEM_BASE && (addr - PSP_USER_MEM_BASE) < m_userMemorySize) {
+            return m_userMemory + (addr - PSP_USER_MEM_BASE);
+        }
+        return nullptr;
+    };
+
+    switch (code) {
+        case 0x2035: // sceDisplayWaitVblankStart
+            cpu.setReg(2, sceDisplayWaitVblankStart());
+            break;
+        case 0x2036: // sceDisplaySetMode
+            cpu.setReg(2, sceDisplaySetMode(a0, a1, a2));
+            break;
+        case 0x2037: // sceDisplaySetFrameBuf
+            cpu.setReg(2, sceDisplaySetFrameBuf(a0, a1, a2, a3));
+            break;
+        case 0x1001: // sceCtrlReadBufferPositive
+            if (void* ptr = resolvePtr(a0)) {
+                cpu.setReg(2, sceCtrlReadBufferPositive(static_cast<SceCtrlData*>(ptr), a1));
+            } else {
+                cpu.setReg(2, 0);
+            }
+            break;
+        case 0x1002: // sceCtrlPeekBufferPositive
+            if (void* ptr = resolvePtr(a0)) {
+                cpu.setReg(2, sceCtrlPeekBufferPositive(static_cast<SceCtrlData*>(ptr), a1));
+            } else {
+                cpu.setReg(2, 0);
+            }
+            break;
+        case 0x0100: // sceIoOpen
+            if (const char* str = static_cast<const char*>(resolvePtr(a0))) {
+                cpu.setReg(2, sceIoOpen(str, a1, a2));
+            } else {
+                cpu.setReg(2, -1);
+            }
+            break;
+        case 0x0101: // sceIoRead
+            if (void* buf = resolvePtr(a1)) {
+                cpu.setReg(2, sceIoRead(a0, buf, a2));
+            } else {
+                cpu.setReg(2, -1);
+            }
+            break;
+        case 0x0102: // sceIoWrite
+            if (void* buf = resolvePtr(a1)) {
+                cpu.setReg(2, sceIoWrite(a0, buf, a2));
+            } else {
+                cpu.setReg(2, -1);
+            }
+            break;
+        case 0x0103: // sceIoClose
+            cpu.setReg(2, sceIoClose(a0));
+            break;
+        case 0x0104: // sceIoLseek
+            cpu.setReg(2, static_cast<uint32_t>(sceIoLseek(a0, a1, a2)));
+            break;
+        case 0x0001: // sceKernelDelayThread
+            sceKernelDelayThread(a0);
+            cpu.setReg(2, 0);
+            break;
+        case 0x0002: // sceKernelGetSystemTimeLow
+            cpu.setReg(2, sceKernelGetSystemTimeLow());
+            break;
+        default:
+            // Default success for unhooked stubs
+            cpu.setReg(2, 0);
+            break;
+    }
 }

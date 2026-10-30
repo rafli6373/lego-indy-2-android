@@ -85,12 +85,14 @@ static int initDisplay(AppEngine* engine) {
 
     PspHLE::instance().init(engine->app->activity->assetManager, storagePath);
     PspHLE::instance().setTouchControls(&engine->touchControls);
+    PspHLE::instance().startExecution();
 
     LOGI("Native Engine initialized. Screen resolution: %dx%d", w, h);
     return 0;
 }
 
 static void termDisplay(AppEngine* engine) {
+    PspHLE::instance().stopExecution();
     engine->renderer.destroy();
     PspHLE::instance().shutdown();
 

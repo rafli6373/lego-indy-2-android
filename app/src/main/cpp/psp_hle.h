@@ -41,6 +41,11 @@ public:
     uint32_t sceKernelGetSystemTimeLow();
     void sceKernelDelayThread(uint32_t usec);
 
+    // --- Syscall Dispatcher & CPU Execution ---
+    void dispatchSyscall(uint32_t code);
+    void startExecution();
+    void stopExecution();
+
     // System Status
     bool isGameReady() const { return m_gameReady; }
     std::string getStatusMessage() const { return m_statusMessage; }

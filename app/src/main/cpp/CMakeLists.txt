@@ -25,6 +25,7 @@ add_library(
     SHARED
     ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c
     native_main.cpp
+    psp_cpu.cpp
     psp_vfs.cpp
     psp_elf_loader.cpp
     psp_ge.cpp
