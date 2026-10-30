@@ -118,28 +118,38 @@ bool PspVFS::init(AAssetManager* assetManager, const std::string& primaryStorage
 
     LOGI("PspVFS initialized with primary path: %s", primaryStoragePath.c_str());
 
-    // Probe for LEGO Indiana Jones 2 main game archive
-    const std::vector<std::string> searchPaths = {
-        primaryStoragePath + "/PSP_GAME/USRDIR/legoindy2psp.fib",
-        primaryStoragePath + "/USRDIR/legoindy2psp.fib",
-        primaryStoragePath + "/legoindy2psp.fib",
-        "/sdcard/LEGO_Indy_2/PSP_GAME/USRDIR/legoindy2psp.fib",
-        "/sdcard/Android/data/com.ttgames.legoindy2/files/PSP_GAME/USRDIR/legoindy2psp.fib"
+    // Probe for LEGO Indiana Jones 2 main game archive across standard storage locations
+    struct Candidate {
+        std::string filePath;
+        std::string rootMount;
+    };
+
+    const std::vector<Candidate> candidates = {
+        { primaryStoragePath + "/PSP_GAME/USRDIR/legoindy2psp.fib", primaryStoragePath },
+        { "/sdcard/LEGO_Indy_2/PSP_GAME/USRDIR/legoindy2psp.fib", "/sdcard/LEGO_Indy_2" },
+        { "/sdcard/LEGO_Indy_2/USRDIR/legoindy2psp.fib", "/sdcard/LEGO_Indy_2" },
+        { "/sdcard/LEGO Indiana Jones 2 The Adventure Continues/PSP_GAME/USRDIR/legoindy2psp.fib", "/sdcard/LEGO Indiana Jones 2 The Adventure Continues" },
+        { "/sdcard/Download/LEGO_Indy_2/PSP_GAME/USRDIR/legoindy2psp.fib", "/sdcard/Download/LEGO_Indy_2" },
+        { "/sdcard/Download/LEGO Indiana Jones 2 The Adventure Continues/PSP_GAME/USRDIR/legoindy2psp.fib", "/sdcard/Download/LEGO Indiana Jones 2 The Adventure Continues" },
+        { "/sdcard/PSP_GAME/USRDIR/legoindy2psp.fib", "/sdcard" },
+        { "/sdcard/Android/data/com.ttgames.legoindy2/files/PSP_GAME/USRDIR/legoindy2psp.fib", "/sdcard/Android/data/com.ttgames.legoindy2/files" }
     };
 
     struct stat st{};
-    for (const auto& path : searchPaths) {
-        if (stat(path.c_str(), &st) == 0 && st.st_size > 0) {
+    for (const auto& c : candidates) {
+        if (stat(c.filePath.c_str(), &st) == 0 && st.st_size > 0) {
             m_gameArchiveMounted = true;
-            m_archiveInfo = "VFS Mount OK: legoindy2psp.fib (" + std::to_string(st.st_size / (1024 * 1024)) + " MB)";
-            LOGI("%s", m_archiveInfo.c_str());
+            m_primaryStorage = c.rootMount;
+            mount("disc0:/", c.rootMount);
+            m_archiveInfo = "Mounted: legoindy2psp.fib (" + std::to_string(st.st_size / (1024 * 1024)) + " MB)";
+            LOGI("%s from %s", m_archiveInfo.c_str(), c.filePath.c_str());
             return true;
         }
     }
 
     m_gameArchiveMounted = false;
-    m_archiveInfo = "Awaiting legoindy2psp.fib in storage";
-    LOGW("legoindy2psp.fib not found in standard paths");
+    m_archiveInfo = "Awaiting folder LEGO_Indy_2 in phone storage";
+    LOGW("legoindy2psp.fib not found in candidates");
     return true;
 }
 
